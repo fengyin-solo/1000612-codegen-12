@@ -7,6 +7,8 @@ from app.store import store
 
 MODULE = "project"
 REQUIRED_FIELDS = ["项目编码", "项目名称", "检测方法"]
+# 判定规则字段：检出限、判定上限、计量单位决定检测结果的自动判定口径
+OPTIONAL_FIELDS = ["方法标准号", "检出限", "判定上限", "计量单位", "收费单价"]
 STATUS_ORDER = ["草稿", "已启用", "待修订", "已停用"]
 ACTION_RULES = {"启用项目": "已启用", "提交修订": "待修订", "停用项目": "已停用"}
 NEGATIVE_ACTIONS = ["停用项目"]
@@ -40,6 +42,7 @@ class ProjectService:
         rows = store.rows(MODULE)
         entry = {"id": max((int(row.get("id", 0)) for row in rows), default=0) + 1}
         entry.update({field: values.get(field) for field in REQUIRED_FIELDS})
+        entry.update({field: values.get(field) for field in OPTIONAL_FIELDS if values.get(field) is not None})
         entry["status"] = STATUS_ORDER[0]
         entry["pending"] = True
         entry["abnormal"] = False

@@ -18,6 +18,15 @@
       </article>
     </div>
 
+    <form v-if="showCreate" class="create-panel" @submit.prevent="submitCreate">
+      <label v-for="field in createFields" :key="field" class="filter-item">
+        <span>{{ field }}</span>
+        <input v-model="createForm[field]" :placeholder="`请输入${field}`" />
+      </label>
+      <button class="btn primary" type="submit">提交录入</button>
+      <button class="btn ghost" type="button" @click="closeCreate">取消</button>
+    </form>
+
     <form class="filter-bar" @submit.prevent="reload">
       <label v-for="field in filterFields" :key="field" class="filter-item">
         <span>{{ field }}</span>
@@ -36,7 +45,12 @@
       </thead>
       <tbody>
         <tr v-for="row in rows" :key="String(row.id)">
-          <td v-for="column in columns" :key="column">{{ row[column] ?? '—' }}</td>
+          <td v-for="column in columns" :key="column">
+            <span v-if="column === '判定结论'" class="tag" :class="conclusionClass(row[column])">
+              {{ row[column] ?? '—' }}
+            </span>
+            <template v-else>{{ row[column] ?? '—' }}</template>
+          </td>
           <td class="row-actions">
             <button
               v-for="action in actions"
@@ -57,6 +71,7 @@
 
     <footer class="page-foot">
       <span>共 {{ total }} 条检测结果记录</span>
+      <span v-if="noticeMessage" class="notice-text">{{ noticeMessage }}</span>
       <span v-if="errorMessage" class="error-text">{{ errorMessage }}</span>
     </footer>
   </section>
@@ -70,16 +85,25 @@ import { request } from '@/api/client'
 type Row = Record<string, string | number | null>
 
 const ENDPOINT = '/api/result'
-const columns = ["结果编号", "关联任务", "检测值", "计量单位", "检出限", "判定结论", "录入人员", "结果状态"]
+const columns = ["结果编号", "关联任务", "检测值", "计量单位", "检出限", "判定上限", "判定结论", "录入人员", "结果状态"]
 const actions = ["录入结果", "提交复核", "确认结果"]
-const statuses = ["待录入", "已录入", "待复核", "已确认"]
-const stats = [{"label": "待录入结果", "value": 0}, {"label": "待复核结果", "value": 0}, {"label": "不合格结果数", "value": 0}]
+const createFields = ["结果编号", "关联任务", "检测值", "计量单位", "录入人员"]
 
 const rows = ref<Row[]>([])
 const total = ref(0)
 const errorMessage = ref('')
+const noticeMessage = ref('')
 const filters = ref<Record<string, string>>({})
 const filterFields = columns.slice(0, 3)
+const stats = ref([{"label": "待录入结果", "value": 0}, {"label": "待复核结果", "value": 0}, {"label": "不合格结果数", "value": 0}])
+const showCreate = ref(false)
+const createForm = ref<Record<string, string>>({})
+
+function conclusionClass(value: Row[string]) {
+  if (value === '超出上限') return 'tag-danger'
+  if (value === '待人工判定') return 'tag-warn'
+  return 'tag-ok'
+}
 
 function resetFilters() {
   filters.value = {}
@@ -91,30 +115,80 @@ function exportRows() {
 }
 
 function openCreate() {
-  errorMessage.value = '检测结果登记入口尚未接入审批流'
+  createForm.value = {}
+  showCreate.value = true
+  errorMessage.value = ''
+  noticeMessage.value = ''
+}
+
+function closeCreate() {
+  showCreate.value = false
+  createForm.value = {}
+}
+
+async function submitCreate() {
+  errorMessage.value = ''
+  noticeMessage.value = ''
+  try {
+    const response = await request(ENDPOINT, {
+      method: 'POST',
+      body: JSON.stringify({ values: { ...createForm.value } }),
+    })
+    const payload = await response.json()
+    if (!payload.ok) {
+      errorMessage.value = payload.message || '检测结果录入被拦下'
+      return
+    }
+    noticeMessage.value = payload.message || '检测结果已登记'
+    closeCreate()
+    await Promise.all([reload(), loadStats()])
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : '检测结果登记失败'
+  }
 }
 
 async function runAction(action: string, row: Row) {
   errorMessage.value = ''
+  noticeMessage.value = ''
   try {
     const response = await request(`${ENDPOINT}/${row.id}/actions`, {
       method: 'POST',
-      body: JSON.stringify({ action }),
+      body: JSON.stringify({ values: { action } }),
     })
-    if (!response.ok) {
-      throw new Error('检测结果动作未生效，请稍后重试')
+    const payload = await response.json()
+    if (!payload.ok) {
+      errorMessage.value = payload.message || '检测结果动作未生效'
+      return
     }
-    await reload()
+    noticeMessage.value = payload.message || `检测结果已${action}`
+    await Promise.all([reload(), loadStats()])
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : '检测结果操作失败'
   }
 }
 
+async function loadStats() {
+  try {
+    const response = await request(`${ENDPOINT}/stats`)
+    if (!response.ok) return
+    const payload = await response.json()
+    stats.value = payload.items ?? stats.value
+  } catch {
+    // 统计卡片读取失败时保留上一次数据，不打断列表操作
+  }
+}
+
 async function reload() {
   errorMessage.value = ''
-  const query = new URLSearchParams(filters.value as Record<string, string>).toString()
+  const query = new URLSearchParams()
+  for (const [field, text] of Object.entries(filters.value)) {
+    const keyword = String(text ?? '').trim()
+    if (!keyword) continue
+    // 结果编号对应后端的 keyword 参数，其余字段按中文名透传
+    query.set(field === '结果编号' ? 'keyword' : field, keyword)
+  }
   try {
-    const response = await request(`${ENDPOINT}?${query}`)
+    const response = await request(`${ENDPOINT}?${query.toString()}`)
     if (!response.ok) {
       throw new Error('检测结果列表读取失败')
     }
@@ -126,5 +200,8 @@ async function reload() {
   }
 }
 
-onMounted(reload)
+onMounted(() => {
+  void reload()
+  void loadStats()
+})
 </script>

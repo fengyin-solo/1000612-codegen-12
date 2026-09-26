@@ -12,7 +12,7 @@ router = APIRouter(prefix="/api/project", tags=["检测项目"])
 
 service = ProjectService()
 
-LIST_FIELDS = ["项目编码", "项目名称", "检测方法", "方法标准号", "检出限", "计量单位", "收费单价", "项目状态"]
+LIST_FIELDS = ["项目编码", "项目名称", "检测方法", "方法标准号", "检出限", "判定上限", "计量单位", "收费单价", "项目状态"]
 STATUSES = ["草稿", "已启用", "待修订", "已停用"]
 
 

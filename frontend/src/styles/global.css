@@ -33,3 +33,9 @@ body { margin: 0; background: #f6f8fb; color: #1f2937; }
 .link { border: none; background: none; color: var(--brand); cursor: pointer; padding: 0; }
 .page-foot { display: flex; justify-content: space-between; margin-top: 8px; font-size: 12px; color: var(--muted); }
 .error-text { color: #b42318; }
+.notice-text { color: #067647; }
+.create-panel { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; background: #fff; border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; margin-bottom: 12px; }
+.tag { display: inline-block; padding: 1px 8px; border-radius: 999px; border: 1px solid transparent; font-size: 12px; }
+.tag-ok { color: #067647; background: #ecfdf3; border-color: #abefc6; }
+.tag-warn { color: #b54708; background: #fffaeb; border-color: #fedf89; }
+.tag-danger { color: #b42318; background: #fef3f2; border-color: #fecdca; }
