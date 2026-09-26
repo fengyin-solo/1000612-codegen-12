@@ -100,6 +100,8 @@ class ResultEntry(BaseModel):
     field_5: str | None = None  # 判定结论
     field_6: str | None = None  # 录入人员
     field_7: str | None = None  # 结果状态
+    field_8: str | None = None  # 检测项目
+    field_9: str | None = None  # 判定上限
 
 class ReviewEntry(BaseModel):
     """复核记录明细结构。"""
